@@ -34,7 +34,7 @@ for i in range(N):
     serverPortInitialTransfer = 16000 + i
     serverSocketTCP = socket(AF_INET, SOCK_STREAM)
     serverSocketTCP.bind(('127.0.0.1', serverPortInitialTransfer))
-    serverSocketTCP.listen(1)
+    # serverSocketTCP.listen(1)
     serverSocketTCPList.append(serverSocketTCP)
 
 # serverPortTCPRequest = 12002
@@ -145,9 +145,11 @@ def getChunks(chunkID,):
                 x = random.randint(0,N-1)
                 print(x,"Index")
                 serverSocketTCPRequest = serverSocketTCPList[x]
+                serverSocketTCPRequest = socket(AF_INET, SOCK_STREAM)
                 serverSocketTCPRequest.settimeout(2)
-                serverSocketTCPRequest.connect((i[0],i[1]))
+                serverSocketTCPRequest.connect(i)
                 serverSocketTCPRequest.send("SEND".encode())
+                print("jhdbvjhdbbvjfdvhv")
                 serverSocketTCPRequest.send(str(chunkID).encode())
                 data = serverSocketTCPRequest.recv(1024)
                 serverSocketTCPRequest.close()
@@ -171,6 +173,7 @@ def sendChunks(chunkID,serverSocketTCPRequest, clientAddress):
                 getChunks(chunkID,serverSocketTCPRequest)
             else:
                 data = cahceDict[chunkID]
+                serverSocketTCPRequest = socket(AF_INET, SOCK_STREAM)
                 serverSocketTCPRequest.connect(clientAddress)
                 serverSocketTCPRequest.send("GET".encode())
                 serverSocketTCPRequest.send(str(chunkID).encode())
@@ -267,7 +270,7 @@ def handleChunkRequest(serverSocketUDPRequest):
             sendChunkRequest(i, message, clientAddress)
             while True:
                 try:
-                    sendChunks(int(message.decode()),serverSocketTCPRequest, clientAddress)
+                    sendChunks(int(message.decode()),serverSocketTCPRequest, (clientAddress[0],clientAddress[1]-1000))
                     # requestDict[int(message.decode())].remove(clientAddress[1]-1000)
                     break
                 except Exception as ex:

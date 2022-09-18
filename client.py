@@ -73,11 +73,11 @@ def handleTCP(client:Client):
             connectionSocket, addr = client.clientSocketTCPRequest.accept()
             print("Connected")
             message = connectionSocket.recv(1024).decode()
-            if message.decode() == "SEND":
+            if message == "SEND":
                 i = connectionSocket.recv(1024).decode()
                 connectionSocket.send(client.dict[int(i)])
                 connectionSocket.close()
-            elif message.decode() == "GET":
+            elif message == "GET":
                 i = connectionSocket.recv(1024).decode()
                 client.dict[int(i)] = connectionSocket.recv(1024)
                 connectionSocket.close()
