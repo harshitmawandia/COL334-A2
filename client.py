@@ -67,9 +67,9 @@ def handleTCP(client:Client):
     global N
     while(True):
         try:
-            print(clientList.index(client), client.clientSocketTCPRequest.getsockname())
+            # print(clientList.index(client), client.clientSocketTCPRequest.getsockname())
             client.clientSocketTCPRequest.listen(2*N)
-            # client.clientSocketTCPRequest.settimeout(2)
+            client.clientSocketTCPRequest.settimeout(2)
             connectionSocket, addr = client.clientSocketTCPRequest.accept()
             print("Connected")
             message = connectionSocket.recv(1024).decode()
@@ -84,8 +84,8 @@ def handleTCP(client:Client):
         except Exception as ex:
             template = "An exception of type {0} occurred. Arguments:\n{1!r}"
             m = template.format(type(ex).__name__, ex.args)
-            print(m)
-            print(traceback.format_exc())
+            print(m,client.clientSocketTCPRequest.getsockname())
+            # print(traceback.format_exc())
             continue
 
 def requestChunk(client:Client):
@@ -94,21 +94,18 @@ def requestChunk(client:Client):
         for i in client.fileArray:
             if i not in client.dict:
                 message = str(i)
-                print(clientList.index(client), "Requesting Chunk", i)              
+                # print(clientList.index(client), "Requesting Chunk", i)              
                 while True:
                     try:
                         serverPortUDPRequest = randint(13000, 13000+N)
                         serverPortTCPRequest = serverPortUDPRequest - 1000
                         client.clientSocketUDPRequest.sendto(message.encode(), (serverName, serverPortUDPRequest))
-                        print(clientList.index(client))
+                        # print(clientList.index(client))
                         checkMessage, serverAddress = client.clientSocketUDPRequest.recvfrom(1024)
                         if(checkMessage.decode() == "Received"):
                             break
                     except Exception as ex:
-                        template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-                        m = template.format(type(ex).__name__, ex.args)
-                        print(m)
-                        print(traceback.format_exc())
+                        # print(traceback.format_exc())
                         requestChunk(client)
                         if(type(ex).__name__ == "timeout"):
                             requestChunk(client)
@@ -129,9 +126,6 @@ def requestChunk(client:Client):
             if(checkMessage.decode() == "Received"):
                 break
         except Exception as ex:
-            template = "An exception of type {0} occurred. Arguments:\n{1!r}"
-            m = template.format(type(ex).__name__, ex.args)
-            print(m)
             print(traceback.format_exc())
             continue
     completed+=1
@@ -148,13 +142,13 @@ def sendChunk(client:Client):
             except Exception as ex:
                 template = "An exception of type {0} occurred. Arguments:\n{1!r}"
                 m = template.format(type(ex).__name__, ex.args)
-                print(m)
-                print(traceback.format_exc())
+                # print(m)
+                # print(traceback.format_exc())
                 continue
-        print(message.decode(), client.chunkRange[0], client.chunkRange[1])
+        # print(message.decode(), client.chunkRange[0], client.chunkRange[1])
         serverPortTCPRequest = serverAddress[1] - 1000
         if int(message.decode()) in client.dict:
-            print("Sending Chunk")
+            # print("Sending Chunk")
             while True:
                 try:
                     client.clientSocketUDPRequest.sendto("True".encode(), serverAddress)
@@ -173,8 +167,8 @@ def sendChunk(client:Client):
                 except Exception as ex:
                     template = "An exception of type {0} occurred. Arguments:\n{1!r}"
                     m = template.format(type(ex).__name__, ex.args)
-                    print(m)
-                    print(traceback.format_exc())
+                    # print(m)
+                    # print(traceback.format_exc())
                     continue
     print("Done")
 

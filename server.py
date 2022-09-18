@@ -8,6 +8,7 @@ import random
 import os
 import traceback
 from urllib import request
+import time
 
 lock = threading.Lock()
 
@@ -22,13 +23,19 @@ N = 3
 
 serverSocketTCPList = []
 serverSocketUDPList = []
+serverSocketInitialTransferList = []
 
 for i in range(N):
     serverPortInitialTransfer = 12000 + i
     serverSocketInitialTransfer = socket(AF_INET, SOCK_STREAM)
     serverSocketInitialTransfer.bind(('127.0.0.1', serverPortInitialTransfer))
     serverSocketInitialTransfer.listen(N)
-    serverSocketTCPList.append(serverSocketInitialTransfer)
+    serverSocketInitialTransferList.append(serverSocketInitialTransfer)
+    serverPortInitialTransfer = 16000 + i
+    serverSocketTCP = socket(AF_INET, SOCK_STREAM)
+    serverSocketTCP.bind(('127.0.0.1', serverPortInitialTransfer))
+    serverSocketTCP.listen(1)
+    serverSocketTCPList.append(serverSocketTCP)
 
 # serverPortTCPRequest = 12002
 # serverSocketTCPRequest = socket(AF_INET, SOCK_STREAM)
@@ -68,7 +75,10 @@ def handle_client(serverSocketInitialTransfer):
     for i in range(N):
         if(i not in completedSet):
             handle_client(serverSocketInitialTransfer,)
-            break
+            return
+    serverSocketInitialTransfer.close()
+    print("done")
+    
 
 
 print("The server is ready to send")
@@ -76,7 +86,7 @@ print("The server is ready to send")
 threads = []
 
 for j in range(N):
-    thread = threading.Thread(target=handle_client, args=(serverSocketTCPList[j],))
+    thread = threading.Thread(target=handle_client, args=(serverSocketInitialTransferList[j],))
     i+=1
     threads.append(thread)
     thread.start()
@@ -119,16 +129,23 @@ for i in range(N):
 
 completed = 0
 
-def getChunks(chunkID,serverSocketTCPRequest):
+def getChunks(chunkID,):
     global chunkDict
+    global serverSocketTCPList
+    global N
     # global requestDict
     l = chunkDict[chunkID]
     random.shuffle(l)
     b = True;
+    print("sjdbdsbvsvinvjd")
     while b:
         try:
             for i in l:
                 print(i)
+                x = random.randint(0,N-1)
+                print(x,"Index")
+                serverSocketTCPRequest = serverSocketTCPList[x]
+                serverSocketTCPRequest.settimeout(2)
                 serverSocketTCPRequest.connect((i[0],i[1]))
                 serverSocketTCPRequest.send("SEND".encode())
                 serverSocketTCPRequest.send(str(chunkID).encode())
@@ -137,7 +154,8 @@ def getChunks(chunkID,serverSocketTCPRequest):
                 b = False
                 return data
         except Exception as ex:
-            # print(traceback.format_exc())
+            print(traceback.format_exc())                
+            time.sleep(1)
             # print(l)
             pass
         
@@ -153,7 +171,7 @@ def sendChunks(chunkID,serverSocketTCPRequest, clientAddress):
                 getChunks(chunkID,serverSocketTCPRequest)
             else:
                 data = cahceDict[chunkID]
-                serverSocketTCPRequest.connect(clientAddress[0],clientAddress[1]-1000)
+                serverSocketTCPRequest.connect(clientAddress)
                 serverSocketTCPRequest.send("GET".encode())
                 serverSocketTCPRequest.send(str(chunkID).encode())
                 serverSocketTCPRequest.send(data)
@@ -161,6 +179,8 @@ def sendChunks(chunkID,serverSocketTCPRequest, clientAddress):
                 b = False
         except Exception as ex:
             print(traceback.format_exc())
+            print(clientAddress)
+            
 
 
 
@@ -189,7 +209,7 @@ def sendChunkRequest(i, message, clientAddress):
                     chunkDict[int(message.decode())].append((serverAddress[0],serverAddress[1]-1000))
                     while True:
                         try:
-                            data = getChunks(int(message.decode()),serverSocketTCPRequest)
+                            data = getChunks(int(message.decode()))
                             break
                         except:
                             continue
@@ -233,7 +253,7 @@ def handleChunkRequest(serverSocketUDPRequest):
         if int(message.decode()) in cahceDict:
             while True:
                 try:
-                    sendChunks(int(message.decode()),serverSocketTCPRequest, clientAddress)
+                    sendChunks(int(message.decode()),serverSocketTCPRequest, (clientAddress[0],clientAddress[1]-1000))
                     break
                 except Exception as ex:
                     template = "An exception of type {0} occurred. Arguments:\n{1!r}"
