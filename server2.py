@@ -16,13 +16,13 @@ serverName = '127.0.0.1'
 lock = threading.Lock()
 
 serverTCPList = []
-connectionSocketList = []
+connectionSocketList = {}
 
 data = open("A2_small_file.txt", "rb")
 file = data.read()
 data.close()
 
-hash = hashlib.md5(file)
+hash = hashlib.md5(file).hexdigest()
 
 def initialTransfer(i):
     global file, serverTCPList
@@ -39,24 +39,30 @@ def initialTransfer(i):
         serverTCPList.append(serverSocketTCP)
     try:
         conn, addr = serverSocketTCP.accept()
-        connectionSocketList.append(conn)
+        connectionSocketList[i] = conn
         a = i
+        print(len(file))
         x = math.ceil(len(file)/1024)
         # print(x)
         if(a < N-1):
-            message = "{z} + {y} + {w} + {u}".format(z=a*int(x/N), y=(a+1)*int(x/N), w = x, u = hash.hexdigest())
+            message = "{z} + {y} + {w} + {u}".format(z=a*int(x/N), y=(a+1)*int(x/N), w = x, u = hash)
             print(message)
             conn.send(message.encode())
+            time.sleep(0.2)
             for j in range(a*int(x/N), (a+1)*int(x/N)):
                 conn.send(file[j*1024:(j+1)*1024])
         else:
-            message = "{z} + {y} + {w} + {u}".format(z=a*int(x/N), y=x, w = x, u = hash.hexdigest())
+            message = "{z} + {y} + {w} + {u}".format(z=a*int(x/N), y=x, w = x, u = hash)
             print(message)
             conn.send(message.encode())
-            
+            time.sleep(0.2)
             for j in range(a*int(x/N), x):
-                print(j)
-                conn.send(file[j*1024:(j+1)*1024])
+                print(a,' ',j)
+                if(j == x-1):
+                    conn.send(file[j*1024:])
+                else:
+                    conn.send(file[j*1024:(j+1)*1024])
+            # conn.send(file[x-1*1024:])
     except:
         traceback.print_exc()
         print("Error in initial transfer")
@@ -74,7 +80,7 @@ def handleRequest(i):
         except:
             continue
     while True:
-        print("Waiting for request")
+        # print("Waiting for request")
         try:
             message, clientAddress = serverUDP.recvfrom(1024)
         except Exception as ex:
@@ -93,25 +99,24 @@ def handleRequest(i):
                     serverUDP.sendto(message, (serverName, 15000+j))
                     checkMessage, clientAddress = serverUDP.recvfrom(1024)
                     if(checkMessage.decode() == "HAVE"):
-                        print("Have")
+                        # print("Have")
                         data = connectionSocketList[j].recv(1024)
-                        print("Data received")
+                        # print("Data received")
                         connectionSocketList[i].send(data)
+                        # print("Data sent")
                         if(index in stack):
                             stack.remove(index)
                             stack.append(index)
                         else:
-                            # if(cacheDict.__len__() < N):
+                            if(cacheDict.__len__() < N):
                                 cacheDict[index] = data
                                 stack.append(index)
-                            # else:
-                            #     cacheDict.pop(stack[0])
-                            #     stack.pop(0)
-                            #     cacheDict[index] = data
-                            #     stack.append(index)
+                            else:
+                                cacheDict.pop(stack[0])
+                                stack.pop(0)
+                                cacheDict[index] = data
+                                stack.append(index)
                         break
-                    else:
-                        continue
 threads = []
 for i in range(N):
     thread = threading.Thread(target=initialTransfer, args=(i,))

@@ -27,6 +27,7 @@ class Client:
         self.chunkRange = []
         self.dict = {}
         self.remaining = []
+        self.hash = ""
 
 def initialTransfer(i:int,client:Client):
     print("Initial Transfer Started")
@@ -35,7 +36,7 @@ def initialTransfer(i:int,client:Client):
     message = client.clientSocketTCP.recv(1024).decode()
     chunkRange = message.split(" + ")
     client.chunkRange = chunkRange
-    print(chunkRange)
+    print('client',' ',i,' ',chunkRange)
     client.fileSize = int(chunkRange[2])
     for j in range(client.fileSize):
         client.remaining.append(j)
@@ -44,24 +45,25 @@ def initialTransfer(i:int,client:Client):
 
     for j in range(int(chunkRange[0]), int(chunkRange[1])):
         data = client.clientSocketTCP.recv(1024)
-        print("Client "+str(i)+" Remaining: "+str(len(client.remaining))+ " Chunk: "+str(j))
+        print("Client "+str(i)+" Chunk: "+str(j)+"Range: "+str(chunkRange[0])+" "+str(chunkRange[1]))
         modifiedMessage += data
         client.dict[j] = data
         client.remaining.remove(j)
 
     print("Client: ",i," ", hashlib.md5(modifiedMessage).hexdigest())
-
+    client.hash = hashlib.md5(modifiedMessage).hexdigest()
+    
 
 def UDPRequest(client:Client, i:int):
     print("UDP Request Started")
     shuffle(client.remaining)
     while len(client.remaining) > 0:
         try:
-            client.UDPRequest.sendto(str(client.remaining[0]).encode(), (serverName, 13000+i))
+            client.UDPRequest.sendto(str(client.remaining[0]).encode(), (serverName, 13000+client.a))
             data = client.clientSocketTCP.recv(1024)
             client.dict[client.remaining[0]] = data
             client.remaining.remove(client.remaining[0])
-            print("Client "+str(i)+" Remaining: "+str(len(client.remaining)))
+            print("Client "+str(client.a)+" Remaining: "+str(len(client.remaining)))
         except Exception as ex:
             template = "An exception of type {0} occurred. Arguments:\n{1!r}"
             m = template.format(type(ex).__name__, ex.args)
@@ -72,6 +74,9 @@ def UDPRequest(client:Client, i:int):
     for j in range(client.fileSize):
         bytearrayMessage += client.dict[j]
     print("Client: ",i," ", hashlib.md5(bytearrayMessage).hexdigest())
+    filename = "client" + str(i) + ".txt"
+    with open(filename, "wb") as f:
+        f.write(bytearrayMessage)
     
 
 def UPDSend(client:Client, i:int):
@@ -79,12 +84,13 @@ def UPDSend(client:Client, i:int):
     while(True):
         try:
             message, serverAddress = client.UDPRequest.recvfrom(1024)
-            print("Client "+str(i)+" ", message.decode(),"Received")
+            # print("Client "+str(i)+" ", message.decode(),"Received")
             index= int(message.decode())
             if(index in client.dict):
                 client.UDPRequest.sendto("HAVE".encode(), serverAddress)
-                print("Have Sent")
+                # print("Client "+str(i)+" ", message.decode(),"Received","Have Sent",len(client.dict))
                 client.clientSocketTCP.send(client.dict[index])
+                # print("Client "+str(i)+" ", message.decode(),"Received","Have Sent","Data Sent")                
             else:
                 client.UDPRequest.sendto("DONT".encode(), serverAddress)
         except Exception as ex:
