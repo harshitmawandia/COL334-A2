@@ -4,6 +4,7 @@ import threading
 from random import *
 import traceback
 import time
+import sys
 
 N = 3
 
@@ -17,37 +18,16 @@ class Client:
         self.TCPRequest = socket(AF_INET, SOCK_STREAM)
         self.UDPRequest = socket(AF_INET, SOCK_DGRAM)
         self.UPDSend = socket(AF_INET, SOCK_DGRAM)
-        # while True:
-        #     try:
-        #         self.TCPSend.bind(('', 14000+a))
-        #         break
-        #     except:
-        #         pass
-        # while True:
-        #     try:
-        #         self.TCPRequest.bind(('', 15000+a))
-        #         break
-        #     except:
-        #         pass
-        # while True:
-        #     try:
-        #         self.UDPRequest.bind(('', 16000+a))
-        #         break
-        #     except:
-        #         pass
-        # while True:
-        #     try:
-        #         self.UPDSend.bind(('', 17000+a))
-        #         break
-        #     except:
-        #         pass
         
         self.TCPRequest.bind(('', 15000+a))
         self.UDPRequest.bind(('', 16000+a))
         self.UPDSend.bind(('', 17000+a))
         self.TCPSend.bind(('', 14000+a))
         
-        # self.UDPRequest.settimeout(100)
+        # self.UDPRequest.settimeout(5)
+        # self.TCPRequest.settimeout(5)
+        # self.UPDSend.settimeout(5)
+        # self.TCPSend.settimeout(5)
         # self.clientSocketUDPRequest.settimeout(2)
         self.fileSize = 0
         self.chunkRange = []
@@ -84,7 +64,7 @@ def initialTransfer(i:int,client:Client):
                 print("Client "+str(i)+" Chunk: "+str(j)+"Range: "+str(chunkRange[0])+" "+str(chunkRange[1]))
                 print("Retransmitting")
                 continue     
-        
+
     client.TCPSend.send("Done".encode())
     print("Client: ",i," ", hashlib.md5(modifiedMessage).hexdigest())
     client.hash = hashlib.md5(modifiedMessage).hexdigest()
@@ -94,10 +74,13 @@ def UDPRequest(client:Client, i:int):
     shuffle(client.remaining)
     while len(client.remaining) > 0:
         chunk = client.remaining[0]
+        print("Client: ",i," Remaining Chunk: ",len(client.remaining))
         try:
-            client.TCPSend.send(str(chunk).encode())
+            time.sleep(0.3)
+            client.TCPRequest.send(str(chunk).encode())
+            print("Client: ",i," Requesting Chunk: ",chunk)
             data, serverAddress = client.UDPRequest.recvfrom(1024)
-            client.TCPSend.send("GOT".encode())
+            client.TCPRequest.send("GOT".encode())
             print("Client "+str(i)+" Chunk: "+str(chunk)+"Range: "+str(client.chunkRange[0])+" "+str(client.chunkRange[1]))
         except:
             continue
@@ -115,17 +98,21 @@ def UDPRequest(client:Client, i:int):
 def UDPSend(client:Client, i:int):
     print("UDP Send Started")
     while True:
-        message = client.TCPRequest.recv(1024).decode()
+        message = client.TCPSend.recv(1024).decode()
+        # print("Received Request for chunk: ",message," in client: ",i)
+        print("Client: ",i," Remaining Chunk: ",len(client.remaining))
         index = int(message)
         try:
             if(index in client.dict):
                 client.TCPSend.send("HAVE".encode())
-                checkMessage = client.TCPRequest.recv(1024).decode()
-                while(checkMessage != "GOT"):
-                    client.UPDSend.sendto(client.dict[index], (serverName, 13000+i))
-                    checkMessage = client.TCPRequest.recv(1024).decode()
+                print("Client: ",i," Sending Chunk: ",index)
+                client.UPDSend.sendto(client.dict[index], (serverName, 13000+i))
+                print("Client: ",i," Sent Chunk: ",index)
             else:
                 client.TCPSend.send("DONT".encode())
+                # for j in client.dict:
+                #     print("Client: ",i," Has: ",j)
+                # print("Client: ",i," Does not have chunk: ",index)
         except Exception as e:
             traceback.print_exc()
             continue

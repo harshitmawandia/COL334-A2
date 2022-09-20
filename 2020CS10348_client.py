@@ -1,11 +1,10 @@
 import hashlib
-from multiprocessing.connection import wait
-# from msilib.schema import Class
 from socket import *
 import threading
 from random import *
 import traceback
 import time
+import sys
 
 N = 5
 
@@ -17,6 +16,7 @@ class Client:
         self.a = a
         self.clientSocketTCP = socket(AF_INET, SOCK_STREAM)
         self.clientSocketTCP.bind(('', 14000+a))
+        self.clientSocketTCP.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
         self.UDPRequest = socket(AF_INET, SOCK_DGRAM)
         self.UDPRequest.bind(('', 15000+a))
         self.UPDSend = socket(AF_INET, SOCK_DGRAM)
@@ -30,33 +30,39 @@ class Client:
         self.hash = ""
 
 def initialTransfer(i:int,client:Client):
-    print("Initial Transfer Started")
+    # print("Initial Transfer Started")
     client.clientSocketTCP.connect((serverName, 12000+i))    
-    print("Connected")
+    # print("Connected")
     message = client.clientSocketTCP.recv(1024).decode()
     chunkRange = message.split(" + ")
     client.chunkRange = chunkRange
-    print('client',' ',i,' ',chunkRange)
+    # print('client',' ',i,' ',chunkRange)
     client.fileSize = int(chunkRange[2])
     for j in range(client.fileSize):
         client.remaining.append(j)
 
     modifiedMessage = bytearray()
+    try:
+        for j in range(int(chunkRange[0]), int(chunkRange[1])):
+            data = client.clientSocketTCP.recv(1024)
+            print("Client "+str(i)+" Chunk: "+str(j)+"Range: "+str(chunkRange[0])+" "+str(chunkRange[1]))
+            modifiedMessage += data
+            client.dict[j] = data
+            client.remaining.remove(j)
+    except:
+        traceback.print_exc()
+        sys.exit(1)
 
-    for j in range(int(chunkRange[0]), int(chunkRange[1])):
-        data = client.clientSocketTCP.recv(1024)
-        print("Client "+str(i)+" Chunk: "+str(j)+"Range: "+str(chunkRange[0])+" "+str(chunkRange[1]))
-        modifiedMessage += data
-        client.dict[j] = data
-        client.remaining.remove(j)
+    # print("Client: ",i," ", hashlib.md5(modifiedMessage).hexdigest())
+    client.hash = chunkRange[3]
 
-    print("Client: ",i," ", hashlib.md5(modifiedMessage).hexdigest())
-    client.hash = hashlib.md5(modifiedMessage).hexdigest()
+completed = 0
     
 
 def UDPRequest(client:Client, i:int):
-    print("UDP Request Started")
-    shuffle(client.remaining)
+    global completed
+    # print("UDP Request Started")
+    # shuffle(client.remaining)
     while len(client.remaining) > 0:
         try:
             client.UDPRequest.sendto(str(client.remaining[0]).encode(), (serverName, 13000+client.a))
@@ -73,18 +79,26 @@ def UDPRequest(client:Client, i:int):
     bytearrayMessage = bytearray()
     for j in range(client.fileSize):
         bytearrayMessage += client.dict[j]
-    print("Client: ",i," ", hashlib.md5(bytearrayMessage).hexdigest())
+    hash = hashlib.md5(bytearrayMessage).hexdigest()
+    print("Client: ",i," ",client.hash)
+    client.hash = hash
     filename = "client" + str(i) + ".txt"
     with open(filename, "wb") as f:
         f.write(bytearrayMessage)
+
+    client.UDPRequest.sendto("DONE".encode(), (serverName, 13000+client.a))
+    with lock:
+        completed += 1
     
 
 def UPDSend(client:Client, i:int):
-    print("UDP Send Started")
-    while(True):
+    # print("UDP Send Started")
+    while(completed < N):
         try:
             message, serverAddress = client.UDPRequest.recvfrom(1024)
             # print("Client "+str(i)+" ", message.decode(),"Received")
+            if message.decode() == "DONE":
+                break
             index= int(message.decode())
             if(index in client.dict):
                 client.UDPRequest.sendto("HAVE".encode(), serverAddress)
@@ -98,6 +112,8 @@ def UPDSend(client:Client, i:int):
             m = template.format(type(ex).__name__, ex.args)
             print(m)
             continue
+    client.clientSocketTCP.close()
+
 
 Clients = []
 
@@ -117,7 +133,7 @@ for i in range(N):
 for thread in threads:
     thread.join()
 
-print("Initial Transfer Completed")
+# print("Initial Transfer Completed")
 
 time.sleep(1)
 
@@ -125,3 +141,7 @@ for i in range(N):
     threading.Thread(target=UDPRequest, args=(Clients[i],i,)).start()
     threading.Thread(target=UPDSend, args=(Clients[i],i,)).start()
 
+while True:
+    if completed == N:
+        print("All Clients Completed")
+        break
